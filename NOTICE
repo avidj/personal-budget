@@ -1,0 +1,8 @@
+personal-budget
+Copyright 2026 David Kensche
+
+Licensed under the Apache License, Version 2.0. See LICENSE.
+
+This product integrates with, but does not include, Actual Budget
+(https://actualbudget.org, MIT) and communicates with banks using the
+FinTS/HBCI protocol via python-fints (https://github.com/raphaelm/python-fints, LGPL-3.0).

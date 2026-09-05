@@ -1,0 +1,15 @@
+.git
+.venv
+.env
+.env.*
+inbox
+secrets
+sources.yaml
+tests
+n8n
+scripts
+*.md
+!README.md
+.pytest_cache
+.ruff_cache
+__pycache__

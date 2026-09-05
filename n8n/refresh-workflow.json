@@ -1,0 +1,654 @@
+{
+  "name": "Budget refresh",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Budget refresh\nScheduled refresh of the household budget.\n\n1. **Fetch** rows from a source (today: statements dropped into the local inbox; later: FinTS).\n2. **Dedup** against the pipeline ledger (Postgres) — every row has a stable key.\n3. **Import** into Actual Budget with a deterministic `imported_id` — re-runs never double-import.\n4. **Summarise** balances, net worth and what happened, and save/post it.\n\nn8n only orchestrates: it calls the pipeline's HTTP API and sees counts, never transactions or credentials.",
+        "height": 396,
+        "width": 420,
+        "color": 7
+      },
+      "id": "note-overview",
+      "name": "About this workflow",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -128,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "content": "### Sources\nOne HTTP node per source. Add a branch per bank; they all end in *Summary*.",
+        "height": 120,
+        "width": 260,
+        "color": 4
+      },
+      "id": "note-sources",
+      "name": "Sources note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        528,
+        496
+      ]
+    },
+    {
+      "parameters": {
+        "content": "### Idempotent import\n`dedup` partitions rows into new / changed / known using the ledger; `import` writes only new rows to Actual and records them.",
+        "height": 140,
+        "width": 300,
+        "color": 5
+      },
+      "id": "note-import",
+      "name": "Import note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1056,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "content": "### Summary channel\nToday the summary is saved as a Markdown file in n8n's `local-files` folder. Replace *Save summary* with Telegram / Slack / e-mail when you pick a channel.",
+        "height": 140,
+        "width": 300,
+        "color": 6
+      },
+      "id": "note-summary",
+      "name": "Summary note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        2904,
+        464
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 7,
+              "triggerAtMinute": 30
+            }
+          ]
+        }
+      },
+      "id": "trigger-daily",
+      "name": "Every morning 07:30",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        352,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://pipeline:8000/sources/postbank-giro/fetch",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "fetch-postbank-giro",
+      "name": "Fetch: Postbank Giro",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        592,
+        304
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "pipeline-api-token"
+        }
+      },
+      "notes": "Asks the pipeline for new rows of source postbank-giro. Today the pipeline reads CSV exports from the local inbox; with FinTS it would talk to the bank. n8n never contacts the bank.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-fetched",
+              "leftValue": "={{ $json.fetched }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-new-rows",
+      "name": "Anything fetched?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        832,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://pipeline:8000/batches/{{ $json.batch_id }}/dedup",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "dedup-ledger",
+      "name": "Dedup against ledger",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1088,
+        208
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "pipeline-api-token"
+        }
+      },
+      "notes": "Pipeline compares every row's stable key with its Postgres ledger: new / changed / already known.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://pipeline:8000/batches/{{ $json.batch_id }}/import",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"dry_run\": false}",
+        "options": {}
+      },
+      "id": "import-actual",
+      "name": "Import into Actual",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1328,
+        208
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "pipeline-api-token"
+        }
+      },
+      "notes": "Pipeline writes only new rows into Actual via its API, runs Actual's rules, records them in the ledger.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "url": "http://pipeline:8000/summary",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "summary-fetch",
+      "name": "Summary from pipeline",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2584,
+        304
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "pipeline-api-token"
+        }
+      },
+      "notes": "Balances, net worth, bank-vs-Actual reconciliation, recent runs. Counts only.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const s = $input.first().json;\nconst eur = c => (c / 100).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' });\nconst date = new Date().toISOString().slice(0, 10);\nconst imported = $('Import into Actual').isExecuted ? $('Import into Actual').first().json : null;\n\nconst lines = [`# Budget summary ${date}`, ''];\nlines.push('## Accounts');\nfor (const a of s.accounts) {\n  lines.push(`- ${a.name}${a.off_budget ? ' (off-budget)' : ''}: ${eur(a.balance_cents)}`);\n}\nlines.push('', `**Net worth:** ${eur(s.net_worth_cents)}`, '');\n\nlines.push('## This run');\nif (imported) {\n  const pending = imported.pending ? `, ${imported.pending} pending skipped` : '';\n  lines.push(`- Postbank Giro: ${imported.fetched} rows from ${imported.files.length} file(s) → ${imported.added} added, ${imported.updated} updated, ${imported.unchanged} already known${pending}`);\n} else {\n  lines.push('- Postbank Giro: nothing to import (inbox empty)');\n}\nfor (const r of (s.reconciliation || [])) {\n  lines.push(r.reconciled\n    ? `- ${r.account}: matches the bank's last stated balance ✓`\n    : `- ${r.account}: differs from the bank's last stated balance by ${eur(r.delta_cents)} (run \\`pipeline opening-balance\\` once, or check for a gap between exports)`);\n}\nconst waiting = Object.entries(s.inbox_pending_files || {}).filter(([, n]) => n > 0);\nif (waiting.length) {\n  lines.push(`- Files still waiting in inbox: ${waiting.map(([k, n]) => `${k} (${n})`).join(', ')}`);\n}\n\n\nif ((s.proposals_pending || []).length) {\n  lines.push('', '## Proposed rules awaiting your review');\n  lines.push('| id | payee | proposed category | confidence | rows |', '|---|---|---|---|---|');\n  for (const p of s.proposals_pending) lines.push(`| ${p.short_id} | ${p.payee} | ${p.category} | ${Math.round(p.confidence * 100)}% | ${p.tx_count ?? ''} |`);\n  lines.push('', 'Approve: `pipeline approve <id>` · reject: `pipeline reject <id>` · all confident ones: `pipeline approve --min-confidence 0.9`');\n}\nlines.push('', '## Recent runs');\nfor (const r of (s.recent_runs || []).slice(0, 5)) {\n  lines.push(`- ${String(r.started_at).slice(0, 16)} ${r.source_id}: ${r.status} (+${r.new_rows ?? 0} new, ${r.unchanged_rows ?? 0} known)`);\n}\n\nreturn [{ json: { text: lines.join('\\n'), filename: `budget-summary-${date}.md`, net_worth_cents: s.net_worth_cents } }];"
+      },
+      "id": "format-summary",
+      "name": "Format summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2824,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "toText",
+        "sourceProperty": "text",
+        "options": {
+          "fileName": "={{ $json.filename }}"
+        }
+      },
+      "id": "to-file",
+      "name": "Markdown to file",
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        3064,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "=/files/{{ $('Format summary').item.json.filename }}",
+        "options": {}
+      },
+      "id": "save-summary",
+      "name": "Save summary",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        3304,
+        304
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "trigger-manual",
+      "name": "When clicking 'Execute workflow'",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        352,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://pipeline:8000/rules/apply",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"uncategorized_only\": true}",
+        "options": {}
+      },
+      "id": "apply-rules",
+      "name": "Apply existing rules",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1584,
+        304
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "pipeline-api-token"
+        }
+      },
+      "notes": "Runs the rules you created in Actual over past transactions that have no category yet. Manual categorisations are never touched.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "url": "http://pipeline:8000/categorization/candidates",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "cat-candidates",
+      "name": "Categorisation candidates",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1824,
+        304
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "pipeline-api-token"
+        }
+      },
+      "notes": "Payees still without a category, your categories, examples from your own rules, and the rendered prompt.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-candidates",
+              "leftValue": "={{ $json.count }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-candidates",
+      "name": "Any candidates?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2064,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.system_prompt }}\n\n{{ $json.prompt }}",
+        "hasOutputParser": true,
+        "batching": {}
+      },
+      "id": "propose-categories",
+      "name": "Propose categories",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.7,
+      "position": [
+        2324,
+        184
+      ],
+      "notes": "Local model proposes one category per payee, restricted to your categories.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "model": "llama3.1:8b",
+        "options": {
+          "temperature": 0,
+          "format": "json"
+        }
+      },
+      "id": "ollama-local",
+      "name": "Ollama (local)",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [
+        2284,
+        404
+      ],
+      "credentials": {
+        "ollamaApi": {
+          "name": "ollama-local"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"proposals\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"object\",\n        \"properties\": {\n          \"ref\": {\n            \"type\": \"string\"\n          },\n          \"payee\": {\n            \"type\": \"string\"\n          },\n          \"category_ref\": {\n            \"type\": \"string\"\n          },\n          \"category\": {\n            \"type\": \"string\"\n          },\n          \"confidence\": {\n            \"type\": \"number\"\n          },\n          \"reason\": {\n            \"type\": \"string\"\n          }\n        },\n        \"required\": [\n          \"ref\",\n          \"category_ref\",\n          \"confidence\"\n        ]\n      }\n    }\n  },\n  \"required\": [\n    \"proposals\"\n  ]\n}",
+        "autoFix": false
+      },
+      "id": "proposal-schema",
+      "name": "Proposal schema",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.2,
+      "position": [
+        2484,
+        404
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://pipeline:8000/categorization/proposals",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ proposals: $json.output.proposals, model: 'llama3.1:8b' }) }}",
+        "options": {}
+      },
+      "id": "store-proposals",
+      "name": "Store proposals",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2644,
+        184
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "pipeline-api-token"
+        }
+      },
+      "notes": "Pipeline validates the proposals and queues them for your review (pipeline proposals / approve).",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "content": "### Categorisation assistant\nAfter the import: run your existing Actual rules on uncategorised rows, ask the **local** Ollama model for a category per remaining payee, and queue the proposals. You approve them (`pipeline approve …`); approved proposals become normal Actual rules. Nothing leaves the machine.",
+        "height": 160,
+        "width": 360,
+        "color": 3
+      },
+      "id": "note-ai",
+      "name": "AI note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1884,
+        -26
+      ]
+    }
+  ],
+  "connections": {
+    "Every morning 07:30": {
+      "main": [
+        [
+          {
+            "node": "Fetch: Postbank Giro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch: Postbank Giro": {
+      "main": [
+        [
+          {
+            "node": "Anything fetched?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anything fetched?": {
+      "main": [
+        [
+          {
+            "node": "Dedup against ledger",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Apply existing rules",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dedup against ledger": {
+      "main": [
+        [
+          {
+            "node": "Import into Actual",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Import into Actual": {
+      "main": [
+        [
+          {
+            "node": "Apply existing rules",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Summary from pipeline": {
+      "main": [
+        [
+          {
+            "node": "Format summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format summary": {
+      "main": [
+        [
+          {
+            "node": "Markdown to file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Markdown to file": {
+      "main": [
+        [
+          {
+            "node": "Save summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking 'Execute workflow'": {
+      "main": [
+        [
+          {
+            "node": "Fetch: Postbank Giro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apply existing rules": {
+      "main": [
+        [
+          {
+            "node": "Categorisation candidates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Categorisation candidates": {
+      "main": [
+        [
+          {
+            "node": "Any candidates?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Any candidates?": {
+      "main": [
+        [
+          {
+            "node": "Propose categories",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Summary from pipeline",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Propose categories": {
+      "main": [
+        [
+          {
+            "node": "Store proposals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store proposals": {
+      "main": [
+        [
+          {
+            "node": "Summary from pipeline",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama (local)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Propose categories",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Proposal schema": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Propose categories",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Berlin"
+  },
+  "active": false
+}

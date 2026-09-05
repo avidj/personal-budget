@@ -1,0 +1,33 @@
+# --- runtime data: never commit ---
+.env
+.env.*
+!.env.example
+secrets/
+inbox/*
+!inbox/.gitkeep
+sources.yaml
+*.sqlite
+*.sqlite3
+*.db
+data/
+
+# --- agent / editor artifacts ---
+CLAUDE.md
+.claude/
+.idea/
+.vscode/
+.DS_Store
+
+# --- python ---
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+dist/
+build/
+*.egg-info/
+
+# --- node (if a writer sidecar is ever added) ---
+node_modules/

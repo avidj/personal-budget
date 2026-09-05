@@ -1,0 +1,11 @@
+# Copy to sources.yaml (gitignored). One entry per source. No account numbers needed
+# for manual_import: the account is identified by the Actual account name.
+sources:
+  - id: postbank-giro
+    connector: manual_import
+    format: postbank-csv            # profile in pipeline/formats
+    inbox_glob: "postbank-giro/*.csv"  # relative to the inbox folder
+    actual_account: "Giro"          # exact account name in Actual
+    account_ref: "pb-giro"          # alias used in keys and logs
+    # format_overrides:             # rename columns if the bank changes headers
+    #   purpose: "Verwendungszweck"

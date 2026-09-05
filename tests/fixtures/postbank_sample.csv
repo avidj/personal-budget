@@ -1,0 +1,14 @@
+﻿Umsätze;;;;;;;;;;;;;;;;;
+Girokonto;DE00 0000 0000 0000 0000 00;;;;;;;;;;;;;;;;
+Kontoinhaber;Max Mustermann;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;
+Zeitraum;01.01.2026 - 31.01.2026;;;;;;;;;;;;;;;;
+Letzter Kontostand;;;;3.638,56;EUR;;;;;;;;;;;;
+Hinweis;Vorgemerkte Umsätze sind noch nicht gebucht;;;;;;;;;;;;;;;;
+Buchungstag;Wert;Umsatzart;Begünstigter / Auftraggeber;Verwendungszweck;IBAN / Kontonummer;BIC;Kundenreferenz;Mandatsreferenz;Gläubiger ID;Fremde Gebühren;Betrag;Abweichender Empfänger;Anzahl der Aufträge;Anzahl der Schecks;Soll;Haben;Währung
+2.1.2026;2.1.2026;SEPA-Lastschrift;Muster Energie GmbH;Abschlag Strom Januar Kd-Nr 12345;DE00 1111 1111 1111 1111 11;MUSTDE00XXX;;MREF-0001;DE00ZZZ00000000000;;;;;;-89,00;;EUR
+5.1.2026;5.1.2026;Kartenzahlung;Cafe Beispiel;Kauf 04.01.2026 12:03;;;;;;;;;;;-3,50;;EUR
+5.1.2026;5.1.2026;Kartenzahlung;Cafe Beispiel;Kauf 04.01.2026 12:03;;;;;;;;;;;-3,50;;EUR
+15.1.2026;15.1.2026;Gutschrift;Arbeitgeber Beispiel AG;Gehalt 01/2026;DE00 2222 2222 2222 2222 22;BEISDE00XXX;E2E-2026-01;;;;;;;;;2.500,00;EUR
+31.1.2026;31.1.2026;Vorgemerkt Kartenzahlung;Supermarkt Beispiel;Kauf 31.01.2026;;;;;;;;;;;-42,10;;EUR
+Kontostand am 31.01.2026;;;;;;;;;;;;;;;;3.638,56;EUR
