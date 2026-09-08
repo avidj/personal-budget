@@ -20,6 +20,9 @@ investment accounts. Postgres holds only the import ledger, connector/session
 state, prices and holdings lots. Nothing that touches a bank credential leaves
 your machine. The connectors expose no payment operations.
 
+The n8n workflow:
+![the n8n workflow](Actual-Budget-Workflow.png)
+
 ## Quickstart (local, no bank API needed)
 
 Prerequisites: Docker Desktop, a running n8n (any compose; note its network
