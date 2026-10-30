@@ -13,6 +13,7 @@ data/
 
 # --- agent / editor artifacts ---
 CLAUDE.md
+AGENTS.md
 .claude/
 .idea/
 .vscode/
